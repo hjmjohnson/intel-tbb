@@ -26,6 +26,7 @@ malloc;
 realloc;
 posix_memalign;
 memalign;
+aligned_alloc;
 valloc;
 pvalloc;
 mallinfo;

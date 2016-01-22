@@ -60,16 +60,12 @@ public:
     tbb::task *try_put_task( const T &v ) {
        int i = (int)v;
        ++my_counters[i];
-       return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
+       return const_cast<tbb::task *>(tbb::flow::interface8::SUCCESSFULLY_ENQUEUED);
     }
 
 
 
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) {}
-#else
-    /*override*/void reset_receiver() {}
-#endif
 };
 
 template< typename T >
@@ -164,6 +160,95 @@ void test_single_dest() {
    for (int i = 0; i < N; ++i ) {
        ASSERT( dest_c.get_count(i) == 1, NULL ); 
    }
+}
+
+void test_reset() {
+    //    source_node -> function_node
+    tbb::flow::graph g;
+    tbb::atomic<int> counters3[N];
+    tbb::flow::source_node<int> src3(g, source_body<int>() );
+    tbb::flow::source_node<int> src_inactive(g, source_body<int>(), /*active*/ false );
+    function_body<int> b3( counters3 );
+    tbb::flow::function_node<int,bool> dest3(g, tbb::flow::unlimited, b3 );
+    tbb::flow::make_edge( src3, dest3 );
+    //    source_node already in active state.  Let the graph run,
+    g.wait_for_all();
+    //    check the array for each value.
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 1, NULL ); 
+        counters3[i] = 0;
+    }
+    g.reset(tbb::flow::rf_reset_bodies);  // <-- re-initializes the counts.
+    // and spawns task to run source
+    g.wait_for_all();
+    //    check output queue again.  Should be the same contents.
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 1, NULL ); 
+        counters3[i] = 0;
+    }
+    g.reset();  // doesn't reset the source_node_body to initial state, but does spawn a task
+                // to run the source_node.
+
+    g.wait_for_all();
+    // array should be all zero
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 0, NULL ); 
+    }
+
+    remove_edge(src3, dest3);
+    make_edge(src_inactive, dest3);
+
+    // src_inactive doesn't run
+    g.wait_for_all();
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 0, NULL ); 
+    }
+
+    // run graph
+    src_inactive.activate();
+    g.wait_for_all();
+    // check output
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 1, NULL ); 
+        counters3[i] = 0;
+    }
+    g.reset(tbb::flow::rf_reset_bodies);  // <-- reinitializes the counts
+    // src_inactive doesn't run
+    g.wait_for_all();
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 0, NULL ); 
+    }
+
+    // start it up
+    src_inactive.activate();
+    g.wait_for_all();
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 1, NULL ); 
+        counters3[i] = 0;
+    }
+    g.reset();  // doesn't reset the source_node_body to initial state, and doesn't
+                // spawn a task to run the source_node.
+
+    g.wait_for_all();
+    // array should be all zero
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 0, NULL ); 
+    }
+    src_inactive.activate();
+    // source_node_body is already in final state, so source_node will not forward a message.
+    g.wait_for_all();
+    for (int i = 0; i < N; ++i ) {
+        int v = counters3[i];
+        ASSERT( v == 0, NULL ); 
+    }
 }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
@@ -322,6 +407,7 @@ int TestMain() {
         test_single_dest<int>();
         test_single_dest<float>();
     }
+    test_reset();
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     test_extract();
 #endif

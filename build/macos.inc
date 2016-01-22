@@ -70,6 +70,8 @@ native_compiler := clang
 export compiler ?= clang
 debugger ?= gdb
 
+export stdlib ?= libc++
+
 CMD=$(SHELL) -c
 CWD=$(shell pwd)
 RM?=rm -f

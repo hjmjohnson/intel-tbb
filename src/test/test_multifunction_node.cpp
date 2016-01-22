@@ -492,7 +492,7 @@ struct add_to_counter {
     int my_inner() { return my_invocations; }
 };
 
-template<tbb::flow::graph_buffer_policy FTYPE>
+template<class FTYPE>
 void test_extract() {
     int my_count = 0;
     int cm;

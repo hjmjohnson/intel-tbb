@@ -41,7 +41,7 @@ CPLUS_FLAGS = $(ITT_NOTIFY) -O0 -g -DUSE_PTHREAD -DTBB_USE_DEBUG
 endif
 
 OPENMP_FLAG = -openmp
-LIB_LINK_FLAGS = -shared -i-static -Wl,-soname=$(BUILDING_LIBRARY)
+LIB_LINK_FLAGS = -shared -static-intel -Wl,-soname=$(BUILDING_LIBRARY)
 LIBS += -lpthread -lrt
 LINK_FLAGS = -rdynamic
 C_FLAGS = $(CPLUS_FLAGS)

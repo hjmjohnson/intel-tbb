@@ -62,7 +62,7 @@ struct arena_base : padded<intrusive_list_node> {
     volatile intptr_t my_top_priority;  // heavy use in stealing loop
 #endif /* !__TBB_TASK_PRIORITY */
 
-    //! Maximal currently busy slot.
+    //! Maximal number of currently busy slots.
     atomic<unsigned> my_limit;          // heavy use in stealing loop
 
     //! Task pool for the tasks scheduled via task::enqueue() method
@@ -139,6 +139,9 @@ struct arena_base : padded<intrusive_list_node> {
     //! Number of slots in the arena
     unsigned my_num_slots;
 
+    //! Number of reserved slots (can be occupied only by masters)
+    unsigned my_num_reserved_slots;
+
     //! Indicates if there is an oversubscribing worker created to service enqueued tasks.
     bool my_mandatory_concurrency;
 
@@ -153,34 +156,16 @@ struct arena_base : padded<intrusive_list_node> {
 #endif /* TBB_USE_ASSERT */
 }; // struct arena_base
 
-class arena
-#if (__GNUC__<4 || __GNUC__==4 && __GNUC_MINOR__==0) && !__INTEL_COMPILER
-    : public padded<arena_base>
-#else
-    : private padded<arena_base>
-#endif
+class arena: public padded<arena_base>
 {
-private:
-    friend class generic_scheduler;
-    template<typename SchedulerTraits> friend class custom_scheduler;
-    friend class governor;
-    friend class task_scheduler_observer_v3;
-    friend class market;
-    friend class tbb::task;
-    friend class tbb::task_group_context;
-    friend class allocate_root_with_context_proxy;
-    friend class intrusive_list<arena>;
-    friend class interface7::internal::task_arena_base; // declared in scheduler_common.h
-    friend class interface7::internal::delegated_task;
-    friend class interface7::internal::wait_task;
-
+public:
     typedef padded<arena_base> base_type;
 
     //! Constructor
-    arena ( market&, unsigned max_num_workers );
+    arena ( market&, unsigned max_num_workers, unsigned num_reserved_slots );
 
     //! Allocate an instance of arena.
-    static arena& allocate_arena( market&, unsigned num_slots );
+    static arena& allocate_arena( market&, unsigned num_slots, unsigned num_reserved_slots );
 
     static int unsigned num_slots_to_reserve ( unsigned num_slots ) {
         return max(2u, num_slots);
@@ -189,16 +174,6 @@ private:
     static int allocation_size ( unsigned max_num_workers ) {
         return sizeof(base_type) + num_slots_to_reserve(max_num_workers) * (sizeof(mail_outbox) + sizeof(arena_slot));
     }
-
-#if __TBB_TASK_GROUP_CONTEXT
-    //! Finds all contexts affected by the state change and propagates the new state to them.
-    /** The propagation is relayed to the market because tasks created by one 
-        master thread can be passed to and executed by other masters. This means 
-        that context trees can span several arenas at once and thus state change
-        propagation cannot be generally localized to one arena only. **/
-    template <typename T>
-    bool propagate_task_group_state ( T task_group_context::*mptr_state, task_group_context& src, T new_state );
-#endif /* __TBB_TASK_GROUP_CONTEXT */
 
     //! Get reference to mailbox corresponding to given affinity_id.
     mail_outbox& mailbox( affinity_id id ) {
@@ -263,10 +238,16 @@ private:
     intptr_t workers_task_node_count();
 #endif
 
+    static const size_t out_of_arena = ~size_t(0);
+    //! Tries to occupy a slot in the arena. On success, returns the slot index; if no slot is available, returns out_of_arena.
+    template <bool as_worker>
+    size_t occupy_free_slot( generic_scheduler& s );
+    //! Tries to occupy a slot in the specified range.
+    size_t occupy_free_slot_in_range( generic_scheduler& s, size_t lower, size_t upper );
+
     /** Must be the last data field */
     arena_slot my_slots[1];
 }; // class arena
-
 
 template<bool is_master>
 inline void arena::on_thread_leaving ( ) {

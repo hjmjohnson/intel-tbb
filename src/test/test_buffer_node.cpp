@@ -22,8 +22,8 @@
 #include "tbb/flow_graph.h"
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tick_count.h"
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 #include "harness_graph.h"
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 #include <vector>
 #include <algorithm>
 #endif
@@ -435,9 +435,9 @@ int TestMain() {
     } 
     stop = tbb::tick_count::now();
     REMARK("Buffer_Node Time=%6.6f\n", (stop-start).seconds());
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     test_resets<int,tbb::flow::buffer_node<int> >();
     test_resets<float,tbb::flow::buffer_node<float> >();
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     test_buffer_extract<tbb::flow::buffer_node<int> >().run_tests();
 #endif
     return Harness::Done;

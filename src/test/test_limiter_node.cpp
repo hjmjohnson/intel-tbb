@@ -37,7 +37,7 @@ struct serial_receiver : public tbb::flow::receiver<T> {
 
    /* override */ tbb::task *try_put_task( const T &v ) {
        ASSERT( next_value++  == v, NULL );
-       return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
+       return const_cast<tbb::task *>(tbb::flow::interface8::SUCCESSFULLY_ENQUEUED);
    }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
@@ -51,11 +51,7 @@ struct serial_receiver : public tbb::flow::receiver<T> {
     size_t predecessor_count() { return 0; }
 #endif
 
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
    /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) {next_value = T(0);}
-#else
-   /*override*/void reset_receiver() {next_value = T(0);}
-#endif
 };
 
 template< typename T >
@@ -67,7 +63,7 @@ struct parallel_receiver : public tbb::flow::receiver<T> {
 
    /* override */ tbb::task *try_put_task( const T &/*v*/ ) {
        ++my_count;
-       return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
+       return const_cast<tbb::task *>(tbb::flow::interface8::SUCCESSFULLY_ENQUEUED);
    }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
@@ -79,10 +75,8 @@ struct parallel_receiver : public tbb::flow::receiver<T> {
     void internal_delete_built_predecessor( tbb::flow::sender<T> & ) { }
     void copy_predecessors( predecessor_list_type & ) { }
     size_t predecessor_count( ) { return 0; }
-   /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) {my_count = 0;}
-#else
-   /*override*/void reset_receiver() {my_count = 0;}
 #endif
+   /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) {my_count = 0;}
 };
 
 template< typename T >
@@ -156,7 +150,7 @@ void test_puts_with_decrements( int num_threads, tbb::flow::limiter_node< T >& l
     ASSERT(lim.decrement.predecessor_count() == 1, NULL);
     ASSERT(lim.successor_count() == 1, NULL);
     ASSERT(lim.predecessor_count() == 0, NULL);
-    typename tbb::flow::interface7::internal::decrementer<tbb::flow::limiter_node<T> >::predecessor_list_type dec_preds;
+    typename tbb::flow::interface8::internal::decrementer<tbb::flow::limiter_node<T> >::predecessor_list_type dec_preds;
     lim.decrement.copy_predecessors(dec_preds);
     ASSERT(dec_preds.size() == 1, NULL);
 #endif

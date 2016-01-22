@@ -58,7 +58,7 @@ public:
 
     /* override */ tbb::task * try_put_task( const T &v ) {
         ++my_counters[(int)v];
-        return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
+        return const_cast<tbb::task *>(tbb::flow::interface8::SUCCESSFULLY_ENQUEUED);
     }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
@@ -71,10 +71,8 @@ public:
     /*override*/void copy_predecessors(predecessor_list_type &) {}
     /*override*/size_t predecessor_count() { return 0; }
     /*override*/void clear_predecessors() { }
-    /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { }
-#else
-    /*override*/void reset_receiver() { }
 #endif
+    /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { }
 
 };
 
@@ -179,7 +177,6 @@ void test_parallel_broadcasts(int p) {
     run_parallel_broadcasts(p, b_copy);
 }
 
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 // broadcast_node does not allow successors to try_get from it (it does not allow
 // the flow edge to switch) so we only need test the forward direction.
 template<typename T>
@@ -220,6 +217,7 @@ void test_resets() {
     ASSERT(!q0.try_get(j), "edge between nodes not removed");
 }
 
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 void test_extract() {
     int dont_care;
     tbb::flow::graph g;
@@ -335,9 +333,9 @@ int TestMain() {
        test_parallel_broadcasts<int_convertable_type>(p);
    }
 
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
    test_resets<int>();
    test_resets<float>();
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
    test_extract();
 #endif
 

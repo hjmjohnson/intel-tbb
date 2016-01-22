@@ -49,12 +49,12 @@ namespace internal {
             tbb::flow::get<N-1>(my_input).set_up(p, indexer_node_put_task);
             indexer_helper<TupleTypes,N-1>::template set_indexer_node_pointer<IndexerNodeBaseType,PortTuple>(my_input, p);
         }
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         template<typename InputTuple>
         static inline void reset_inputs(InputTuple &my_input, reset_flags f) {
             indexer_helper<TupleTypes,N-1>::reset_inputs(my_input, f);
             tbb::flow::get<N-1>(my_input).reset_receiver(f);
         }
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         template<typename InputTuple>
         static inline void extract(InputTuple &my_input) {
             indexer_helper<TupleTypes,N-1>::extract(my_input);
@@ -71,11 +71,11 @@ namespace internal {
             task *(*indexer_node_put_task)(const T&, void *) = do_try_put<IndexerNodeBaseType, T, 0>;
             tbb::flow::get<0>(my_input).set_up(p, indexer_node_put_task);
         }
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         template<typename InputTuple>
         static inline void reset_inputs(InputTuple &my_input, reset_flags f) {
             tbb::flow::get<0>(my_input).reset_receiver(f);
         }
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         template<typename InputTuple>
         static inline void extract(InputTuple &my_input) {
             tbb::flow::get<0>(my_input).extract_receiver();
@@ -138,16 +138,16 @@ namespace internal {
             return my_try_put_task(v, my_indexer_ptr);
         }
 
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     public:
-        /*override*/void reset_receiver(__TBB_PFG_RESET_ARG(reset_flags f)) {
-            if(f&rf_clear_edges) my_built_predecessors.clear();
-        }
-        void extract_receiver() { my_built_predecessors.receiver_extract(*this); }
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+        /*override*/void reset_receiver(reset_flags f) { if(f&rf_clear_edges) my_built_predecessors.clear(); }
 #else
-        /*override*/void reset_receiver(__TBB_PFG_RESET_ARG(reset_flags /*f*/)) { }
+        /*override*/void reset_receiver(reset_flags /*f*/) { }
 #endif
 
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+        void extract_receiver() { my_built_predecessors.receiver_extract(*this); }
+#endif
     };
 
     template<typename InputTuple, typename OutputType, typename StructTypes>
@@ -188,7 +188,7 @@ namespace internal {
 #endif
         };
         enum op_stat {WAIT=0, SUCCEEDED, FAILED};
-        typedef indexer_node_base<InputTuple,output_type,StructTypes> my_class;
+        typedef indexer_node_base<InputTuple,output_type,StructTypes> class_type;
 
         class indexer_node_base_operation : public aggregated_operation<indexer_node_base_operation> {
         public:
@@ -209,9 +209,9 @@ namespace internal {
             indexer_node_base_operation(op_type t) : type(char(t)) {}
         };
 
-        typedef internal::aggregating_functor<my_class, indexer_node_base_operation> my_handler;
-        friend class internal::aggregating_functor<my_class, indexer_node_base_operation>;
-        aggregator<my_handler, indexer_node_base_operation> my_aggregator;
+        typedef internal::aggregating_functor<class_type, indexer_node_base_operation> handler_type;
+        friend class internal::aggregating_functor<class_type, indexer_node_base_operation>;
+        aggregator<handler_type, indexer_node_base_operation> my_aggregator;
 
         void handle_operations(indexer_node_base_operation* op_list) {
             indexer_node_base_operation *current;
@@ -260,13 +260,13 @@ namespace internal {
         indexer_node_base(graph& g) : graph_node(g), input_ports_type() {
             indexer_helper<StructTypes,N>::set_indexer_node_pointer(this->my_inputs, this);
             my_successors.set_owner(this);
-            my_aggregator.initialize_handler(my_handler(this));
+            my_aggregator.initialize_handler(handler_type(this));
         }
 
         indexer_node_base(const indexer_node_base& other) : graph_node(other.my_graph), input_ports_type(), sender<output_type>() {
             indexer_helper<StructTypes,N>::set_indexer_node_pointer(this->my_inputs, this);
             my_successors.set_owner(this);
-            my_aggregator.initialize_handler(my_handler(this));
+            my_aggregator.initialize_handler(handler_type(this));
         }
 
         bool register_successor(successor_type &r) {
@@ -318,13 +318,11 @@ namespace internal {
         }
 #endif /* TBB_PREVIEW_FLOW_GRAPH_FEATURES */
     protected:
-        /*override*/void reset_node(__TBB_PFG_RESET_ARG(reset_flags f)) {
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+        /*override*/void reset_node(reset_flags f) {
             if(f & rf_clear_edges) {
                 my_successors.clear();
                 indexer_helper<StructTypes,N>::reset_inputs(this->my_inputs,f);
             }
-#endif
         }
 
     private:

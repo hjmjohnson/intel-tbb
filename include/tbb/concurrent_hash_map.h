@@ -44,7 +44,7 @@
 #include "atomic.h"
 #include "tbb_exception.h"
 #include "tbb_profiling.h"
-#include "internal/_concurrent_unordered_impl.h" // Need tbb_hasher
+#include "internal/_tbb_hash_compare_impl.h"
 #if __TBB_INITIALIZER_LISTS_PRESENT
 #include <initializer_list>
 #endif
@@ -56,13 +56,6 @@
 #endif
 
 namespace tbb {
-
-//! hash_compare that is default argument for concurrent_hash_map
-template<typename Key>
-struct tbb_hash_compare {
-    static size_t hash( const Key& a ) { return tbb_hasher(a); }
-    static bool equal( const Key& a, const Key& b ) { return a == b; }
-};
 
 namespace interface5 {
 

@@ -93,7 +93,12 @@
 #define __TBB_CPP11_INIT_LIST_TEMP_OBJS_LIFETIME_BROKEN (_MSC_FULL_VER < 180030501 && _MSC_VER && !__INTEL_COMPILER)
 //Implementation of C++11 std::placeholders in libstdc++ coming with gcc prior to 4.5 reveals bug in Intel Compiler 13 causing "multiple definition" link errors.
 #define __TBB_CPP11_STD_PLACEHOLDERS_LINKAGE_BROKEN ((__INTEL_COMPILER == 1300 || __INTEL_COMPILER == 1310 )&& __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GCC_VERSION < 40500)
-
+// Intel(R) Compiler have an issue when a scoped enum with a specified underlying type has negative values.
+#define __TBB_ICC_SCOPED_ENUM_WITH_UNDERLYING_TYPE_NEGATIVE_VALUE_BROKEN ( _MSC_VER && !__TBB_DEBUG && __INTEL_COMPILER && __INTEL_COMPILER <= 1500 )
+// Intel(R) Compiler have an issue with __atomic_load_explicit from a scoped enum with a specified underlying type.
+#define __TBB_ICC_SCOPED_ENUM_WITH_UNDERLYING_TYPE_ATOMIC_LOAD_BROKEN ( TBB_USE_ICC_BUILTINS && !__TBB_DEBUG && __INTEL_COMPILER && __INTEL_COMPILER <= 1500 )
+//Unable to use constexpr member functions to initialize compile time constants
+#define __TBB_CONSTEXPR_MEMBER_FUNCTION_BROKEN (__INTEL_COMPILER == 1500)
 //some compilers do not generate implicitly move constructor and assignment operator, as this feature (r-value reference 3.0) was added later
 #if __clang__ &&  !__INTEL_COMPILER
   #define __TBB_CPP11_IMPLICIT_MOVE_MEMBERS_GENERATION_BROKEN !__has_feature(cxx_implicit_moves)
@@ -116,6 +121,9 @@
 #define __TBB_CAS_8_CODEGEN_BROKEN (__TBB_x86_32 && __PIC__ && __TBB_GCC_VERSION == 40102 && !__INTEL_COMPILER)
 
 #define __TBB_THROW_FROM_DTOR_BROKEN (__clang__ &&  (__apple_build_version__ &&  __apple_build_version__ < 5000279 || __TBB_CLANG_VERSION && __TBB_CLANG_VERSION < 50000))
+
+//std::uncaught_exception is broken on some version of stdlibc++ (it returns true with no active exception)
+#define __TBB_STD_UNCAUGHT_EXCEPTION_BROKEN (__linux__ && (__TBB_GCC_VERSION == 40407 || __TBB_GCC_VERSION == 40902))
 
 #if __TBB_LIBSTDCPP_EXCEPTION_HEADERS_BROKEN
   #define _EXCEPTION_PTR_H /* prevents exception_ptr.h inclusion */

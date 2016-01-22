@@ -91,6 +91,12 @@ ifeq (ok,$(call detect_js,/minversion cl 17))
         CPLUS_FLAGS += /volatile:iso
 endif
 
+# Since VS2013, VC++ uses the same .pdb file for different sources so we need
+# to add /FS (Force Synchronous PDB Writes)
+ifeq (ok,$(call detect_js,/minversion cl 18))
+        CPLUS_FLAGS += /FS
+endif
+
 CPLUS_FLAGS += /DUSE_WINTHREAD /D_CRT_SECURE_NO_DEPRECATE \
         /D_WIN32_WINNT=$(_WIN32_WINNT)
 C_FLAGS = $(CPLUS_FLAGS)

@@ -71,6 +71,17 @@ extern "C" int64_t __TBB_machine_cmpswp8__TBB_full_fence(volatile void *ptr, int
     return result;
 }
 
+pthread_mutex_t fetchstore_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+int64_t __TBB_machine_fetchstore8__TBB_full_fence (volatile void *ptr, int64_t value)
+{
+    pthread_mutex_lock(&fetchstore_mutex);
+    int64_t result = *(int64_t*)ptr;
+    *(int64_t*)ptr = value;
+    pthread_mutex_unlock(&fetchstore_mutex);
+    return result;
+}
+
 #endif /* __linux__  && __ia64 */
 
 #endif // harness_tbb_independence_H

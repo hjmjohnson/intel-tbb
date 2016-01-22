@@ -51,9 +51,9 @@ ifneq (,$(shell grep xtest `echo "\#include<immintrin.h>" | clang -E -M - 2>&1 |
     RTM_KEY = -mrtm
 endif
 
-ifeq (libc++,$(stdlib))
-    CPLUS_FLAGS    += -stdlib=libc++
-    LIB_LINK_FLAGS += -stdlib=libc++
+ifneq (,$(stdlib))
+    CPLUS_FLAGS    += -stdlib=$(stdlib)
+    LIB_LINK_FLAGS += -stdlib=$(stdlib)
 endif
 
 CPP11_FLAGS = -std=c++11 -D_TBB_CPP0X

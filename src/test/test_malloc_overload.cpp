@@ -33,24 +33,18 @@
 #define _CRT_NONSTDC_NO_DEPRECATE 1
 #endif // _WIN32 || _WIN64
 
+#define _ISOC11_SOURCE 1 // to get C11 declarations for GLIBC
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
 
-#include "tbb/tbb_config.h" // to get __TBB_WIN8UI_SUPPORT
+#include "harness_allocator_overload.h"
 
-#if __linux__ || __APPLE__
-#define MALLOC_REPLACEMENT_AVAILABLE 1
-#elif _WIN32 && !__MINGW32__ && !__MINGW64__ && !__TBB_WIN8UI_SUPPORT
-#define MALLOC_REPLACEMENT_AVAILABLE 2
+#if MALLOC_WINDOWS_OVERLOAD_ENABLED
 #include "tbb/tbbmalloc_proxy.h"
 #endif
 
-// LD_PRELOAD mechanism is broken in offload, no support for MSVC 2015 in debug for now
-#if __TBB_MIC_OFFLOAD || !MALLOC_REPLACEMENT_AVAILABLE || (_MSC_VER >= 1900 && _DEBUG)
-#define HARNESS_SKIP_TEST 1
-#endif
 #include "harness.h"
 
-#if MALLOC_REPLACEMENT_AVAILABLE
+#if !HARNESS_SKIP_TEST
 
 #if __ANDROID__
   #include <android/api-level.h> // for __ANDROID_API__
@@ -58,6 +52,10 @@
 
 #define __TBB_POSIX_MEMALIGN_PRESENT (__linux__ && !__ANDROID__) || __APPLE__
 #define __TBB_PVALLOC_PRESENT __linux__ && !__ANDROID__
+#if __GLIBC__
+  // aligned_alloc available since GLIBC 2.16
+  #define __TBB_ALIGNED_ALLOC_PRESENT __GLIBC_PREREQ(2, 16)
+#endif // __GLIBC__
  // later Android doesn't have valloc or dlmalloc_usable_size
 #define __TBB_VALLOC_PRESENT (__linux__ && __ANDROID_API__<21) || __APPLE__
 #define __TBB_DLMALLOC_USABLE_SIZE_PRESENT  __ANDROID__ && __ANDROID_API__<21
@@ -71,7 +69,7 @@
 #endif
 #include <stdio.h>
 #include <new>
-#if MALLOC_REPLACEMENT_AVAILABLE == 1
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED || MALLOC_ZONE_OVERLOAD_ENABLED
 #include <unistd.h> // for sysconf
 #include <dlfcn.h>
 #endif
@@ -144,6 +142,7 @@ public:
     static BackRefIdx newBackRef(bool largeObj);
 };
 
+class MemoryPool;
 class ExtMemoryPool;
 
 class BlockI {
@@ -151,6 +150,7 @@ class BlockI {
 };
 
 struct LargeMemoryBlock : public BlockI {
+    MemoryPool       *pool;          // owner pool
     LargeMemoryBlock *next,          // ptrs in list of cached blocks
                      *prev,
                      *gPrev,         // in pool's global list 
@@ -192,9 +192,9 @@ static void scalableMallocCheckSize(void *object, size_t size)
         ASSERT(uintptr_t(lmb)<uintptr_t(((LargeObjectHdr*)object-1))
                && lmb->objectSize >= size, NULL);
     }
-#if MALLOC_REPLACEMENT_AVAILABLE == 1
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED || MALLOC_ZONE_OVERLOAD_ENABLED
     ASSERT(malloc_usable_size(object) >= size, NULL);
-#elif MALLOC_REPLACEMENT_AVAILABLE == 2
+#elif MALLOC_WINDOWS_OVERLOAD_ENABLED
     // Check that _msize works correctly
     ASSERT(_msize(object) >= size, NULL);
     ASSERT(size<8 || _aligned_msize(object,8,0) >= size, NULL);
@@ -219,7 +219,7 @@ void CheckStdFuncOverload(void *(*malloc_p)(size_t), void *(*calloc_p)(size_t, s
     free_p(ptr1);
 }
 
-#if MALLOC_REPLACEMENT_AVAILABLE == 1
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED || MALLOC_ZONE_OVERLOAD_ENABLED
 
 void CheckMemalignFuncOverload(void *(*memalign_p)(size_t, size_t),
                                void (*free_p)(void*))
@@ -252,7 +252,7 @@ void CheckPvalloc(void *(*pvalloc_p)(size_t), void (*free_p)(void*))
     }
 }
 
-#endif // MALLOC_REPLACEMENT_AVAILABLE
+#endif // MALLOC_UNIXLIKE_OVERLOAD_ENABLED || MALLOC_ZONE_OVERLOAD_ENABLED
 
 // regression test: on OS X scalable_free() treated small aligned object,
 // placed in large block, as small block
@@ -266,7 +266,7 @@ void CheckFreeAligned() {
 #if __TBB_POSIX_MEMALIGN_PRESENT
             int ret = posix_memalign(&ptr, align[a], sz[s]);
             ASSERT(!ret, NULL);
-#elif MALLOC_REPLACEMENT_AVAILABLE == 2
+#elif MALLOC_WINDOWS_OVERLOAD_ENABLED
             ptr = _aligned_malloc(sz[s], align[a]);
 #endif
             ASSERT(is_aligned(ptr, align[a]), NULL);
@@ -310,7 +310,7 @@ void TestZoneOverload() {
 int TestMain() {
     void *ptr, *ptr1;
 
-#if MALLOC_REPLACEMENT_AVAILABLE == 1
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED || MALLOC_ZONE_OVERLOAD_ENABLED
     ASSERT(dlsym(RTLD_DEFAULT, "scalable_malloc"),
            "Lost dependence on malloc_proxy or LD_PRELOAD was not set?");
 #endif
@@ -340,7 +340,7 @@ int TestMain() {
     free(newEnv);
 
     CheckStdFuncOverload(malloc, calloc, realloc, free);
-#if MALLOC_REPLACEMENT_AVAILABLE == 1
+#if MALLOC_UNIXLIKE_OVERLOAD_ENABLED || MALLOC_ZONE_OVERLOAD_ENABLED
 
 #if __TBB_POSIX_MEMALIGN_PRESENT
     int ret = posix_memalign(&ptr, 1024, 3*minLargeObjectSize);
@@ -357,6 +357,9 @@ int TestMain() {
 #endif
 #if __linux__
     CheckMemalignFuncOverload(memalign, free);
+#if __TBB_ALIGNED_ALLOC_PRESENT
+    CheckMemalignFuncOverload(aligned_alloc, free);
+#endif
 
     struct mallinfo info = mallinfo();
     // right now mallinfo initialized by zero
@@ -375,7 +378,7 @@ int TestMain() {
  #endif
 #endif // __linux__
 
-#elif MALLOC_REPLACEMENT_AVAILABLE == 2
+#else // MALLOC_WINDOWS_OVERLOAD_ENABLED
 
     ptr = _aligned_malloc(minLargeObjectSize, 16);
     scalableMallocCheckSize(ptr, minLargeObjectSize);
@@ -419,4 +422,4 @@ int TestMain() {
 
     return Harness::Done;
 }
-#endif /* MALLOC_REPLACEMENT_AVAILABLE */
+#endif // !HARNESS_SKIP_TEST

@@ -148,7 +148,7 @@ public:
         The scheduler is really expected to execute all tasks before task_stream destruction. */
     intptr_t drain() {
         intptr_t result = 0;
-        for(unsigned level = 0; level < Levels; level++)
+        for(int level = 0; level < Levels; level++)
             for(unsigned i=0; i<N; ++i) {
                 lane_t& lane = lanes[level][i];
                 spin_mutex::scoped_lock lock(lane.my_mutex);

@@ -18,12 +18,12 @@
     reasons why the executable file might be covered by the GNU General Public License.
 */
 
-#define TBB_PREVIEW_FLOW_GRAPH_NODES 1
-
 #include "tbb/tbb_config.h"
 #include <cstdio>
 
-#if __TBB_PREVIEW_COMPOSITE_NODE
+#include "../../common/utility/utility.h"
+
+#if __TBB_FLOW_GRAPH_CPP11_FEATURES
 
 #if _MSC_VER
 #pragma warning (disable: 4503) // Suppress "decorated name length exceeded, name was truncated" warning
@@ -54,7 +54,7 @@ int get_default_num_threads() {
 #endif
 
 int main(int argc, char *argv[]) {
-#if __TBB_PREVIEW_COMPOSITE_NODE
+#if __TBB_FLOW_GRAPH_CPP11_FEATURES
     try {
         utility::thread_number_range threads(get_default_num_threads);
         utility::parse_cli_arguments(argc, argv,
@@ -638,8 +638,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 #else
-    printf("skipped\n");
+    utility::report_skipped();
     return 0;
-#endif // __TBB_PREVIEW_COMPOSITE_NODE
+#endif // __TBB_FLOW_GRAPH_CPP11_FEATURES
 }
 

@@ -2,6 +2,60 @@
 The list of most significant changes made over time in
 Intel(R) Threading Building Blocks (Intel(R) TBB).
 
+Intel TBB 4.4
+TBB_INTERFACE_VERSION == 9000
+
+- The following features are now fully supported:
+    tbb::flow::composite_node;
+    additional policies of tbb::flow::graph_node::reset().
+- Platform abstraction layer for Windows* OS updated to use compiler
+    intrinsics for most atomic operations.
+- The tbb/compat/thread header updated to automatically include
+    C++11 <thread> where available.
+- Fixes and refactoring in the task scheduler and class task_arena.
+- Added key_matching policy to tbb::flow::join_node, which removes
+    the restriction on the type that can be compared-against.
+- For tag_matching join_node, tag_value is redefined to be 64 bits
+    wide on all architectures.
+- Expanded the documentation for the flow graph with details about
+    node semantics and behavior.
+- Added dynamic replacement of C11 standard function aligned_alloc()
+    under Linux* OS.
+- Added C++11 move constructors and assignment operators to
+    tbb::enumerable_thread_specific container.
+- Added hashing support for tbb::tbb_thread::id.
+- On OS X*, binaries that depend on libstdc++ are not provided anymore.
+    In the makefiles, libc++ is now used by default; for building with
+    libstdc++, specify stdlib=libstdc++ in the make command line.
+
+Preview Features:
+
+- Added a new example, graph/fgbzip2, that shows usage of
+    tbb::flow::async_node.
+- Modification to the low-level API for memory pools:
+    added a function for finding a memory pool by an object allocated
+    from that pool.
+- tbb::memory_pool now does not request memory till the first allocation
+    from the pool.
+
+Changes affecting backward compatibility:
+
+- Internal layout of flow graph nodes has changed; recompilation is
+    recommended for all binaries that use the flow graph.
+- Resetting a tbb::flow::source_node will immediately activate it,
+    unless it was created in inactive state.
+
+Bugs fixed:
+
+- Failure at creation of a memory pool will not cause process
+    termination anymore.
+
+Open-source contributions integrated:
+
+- Supported building TBB with Clang on AArch64 with use of built-in
+    intrinsics by David A.
+
+------------------------------------------------------------------------
 Intel TBB 4.3 Update 6
 TBB_INTERFACE_VERSION == 8006
 

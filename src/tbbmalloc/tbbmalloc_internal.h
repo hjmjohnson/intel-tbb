@@ -37,6 +37,7 @@
 
 // TODO: *BSD also has it
 #define BACKEND_HAS_MREMAP __linux__
+#define CHECK_ALLOCATION_RANGE MALLOC_DEBUG || MALLOC_ZONE_OVERLOAD_ENABLED || MALLOC_UNIXLIKE_OVERLOAD_ENABLED
 
 #include "tbb/tbb_config.h" // for __TBB_LIBSTDCPP_EXCEPTION_HEADERS_BROKEN
 #if __TBB_LIBSTDCPP_EXCEPTION_HEADERS_BROKEN
@@ -133,8 +134,8 @@ extern const uint32_t minLargeObjectSize;
 class TLSKey {
     tls_key_t TLS_pointer_key;
 public:
-    TLSKey();
-   ~TLSKey();
+    bool init();
+    bool destroy();
     TLSData* getThreadMallocTLS() const;
     void setThreadMallocTLS( TLSData * newvalue );
     TLSData* createTLS(MemoryPool *memPool, Backend *backend);
@@ -449,9 +450,7 @@ public:
             bin[i].init();
         bitMask.reset();
     }
-#if __TBB_MALLOC_LOCACHE_STAT
     void reportStat(FILE *f);
-#endif
 #if __TBB_MALLOC_WHITEBOX_TEST
     size_t getLOCSize() const;
     size_t getUsedSize() const;
@@ -511,9 +510,7 @@ public:
         largeCache.reset();
         hugeCache.reset();
     }
-#if __TBB_MALLOC_LOCACHE_STAT
     void reportStat(FILE *f);
-#endif
 #if __TBB_MALLOC_WHITEBOX_TEST
     size_t getLOCSize() const;
     size_t getUsedSize() const;
@@ -550,6 +547,7 @@ class BlockI {
 };
 
 struct LargeMemoryBlock : public BlockI {
+    MemoryPool       *pool;          // owner pool
     LargeMemoryBlock *next,          // ptrs in list of cached blocks
                      *prev,
     // 2-linked list of pool's large objects
@@ -643,6 +641,7 @@ public:
     MemRegion  *head;
     void add(MemRegion *r);
     void remove(MemRegion *r);
+    int reportStat(FILE *f);
 };
 
 class Backend {
@@ -685,11 +684,11 @@ public:
 
         void removeBlock(FreeBlock *fBlock);
         void reset() { head = tail = 0; }
-#if __TBB_MALLOC_BACKEND_STAT
-        size_t countFreeBlocks();
-        void reportStat(FILE *f);
-#endif
         bool empty() const { return !head; }
+
+        size_t countFreeBlocks();
+        size_t reportFreeBlocks(FILE *f);
+        void reportStat(FILE *f);
     };
 
     typedef BitMaskMin<Backend::freeBinsNum> BitMaskBins;
@@ -713,10 +712,8 @@ public:
             return p == -1 ? Backend::freeBinsNum : p;
         }
         void verify();
-#if __TBB_MALLOC_BACKEND_STAT
-        void reportStat(FILE *f);
-#endif
         void reset();
+        void reportStat(FILE *f);
     };
 
 private:
@@ -735,27 +732,64 @@ private:
         inline bool operator()(size_t oldMaxReq, size_t requestSize) const;
     };
 
-    ExtMemoryPool *extMemPool;
-    // used for release every region on pool destroying
-    MemRegionList  regionList;
+#if CHECK_ALLOCATION_RANGE
+    // Keep min and max of all addresses requested from OS,
+    // use it for checking memory possibly allocated by replaced allocators
+    // and for debugging purposes. Valid only for default memory pool.
+    class UsedAddressRange {
+        static const uintptr_t ADDRESS_UPPER_BOUND = UINTPTR_MAX;
 
-    CoalRequestQ   coalescQ; // queue of coalescing requests
-    BackendSync    bkndSync;
+        uintptr_t   leftBound,
+                    rightBound;
+        MallocMutex mutex;
+    public:
+        // rightBound is zero-initialized
+        void init() { leftBound = ADDRESS_UPPER_BOUND; }
+        void registerAlloc(uintptr_t left, uintptr_t right);
+        void registerFree(uintptr_t left, uintptr_t right);
+        // as only left and right bounds are kept, we can return true
+        // for pointer not allocated by us, if more than single region
+        // was requested from OS
+        bool inRange(void *ptr) const {
+            const uintptr_t p = (uintptr_t)ptr;
+            return leftBound<=p && p<=rightBound;
+        }
+    };
+#else
+    class UsedAddressRange {
+    public:
+        void init() { }
+        void registerAlloc(uintptr_t, uintptr_t) {}
+        void registerFree(uintptr_t, uintptr_t) {}
+        bool inRange(void *) const { return true; }
+    };
+#endif
+
+    ExtMemoryPool   *extMemPool;
+    // used for release every region on pool destroying
+    MemRegionList    regionList;
+
+    CoalRequestQ     coalescQ; // queue of coalescing requests
+    BackendSync      bkndSync;
     // semaphore protecting adding more more memory from OS
     MemExtendingSema memExtendingSema;
-    size_t         totalMemSize,
-                   memSoftLimit;
-    // Fixed pools request memory once per lifetime, during pool_create.
-    // Status of memory acquisition for such pool keeps here.
-    // So value is changed only for fixed pools, and without synchronization,
-    // as pool is not available till returning from pool_create.
-    bool           rawMemReceived;
+    size_t           totalMemSize,
+                     memSoftLimit;
+    UsedAddressRange usedAddrRange;
+    // to keep 1st allocation large than requested, keep bootstrapping status
+    enum {
+        bootsrapMemNotDone = 0,
+        bootsrapMemInitializing,
+        bootsrapMemDone
+    };
+    intptr_t         bootsrapMemStatus;
+    MallocMutex      bootsrapMemStatusMutex;
 
     // Using of maximal observed requested size allows decrease
     // memory consumption for small requests and decrease fragmentation
     // for workloads when small and large allocation requests are mixed.
     // TODO: decrease, not only increase it
-    size_t         maxRequestedSize;
+    size_t           maxRequestedSize;
 
     FreeBlock *addNewRegion(size_t size, MemRegionType type, bool addToBin);
     FreeBlock *findBlockInRegion(MemRegion *region, size_t exactBlockSize);
@@ -764,6 +798,7 @@ private:
 
     FreeBlock *releaseMemInCaches(intptr_t startModifiedCnt,
                                   int *lockedBinsThreshold, int numOfLockedBins);
+    void requestBootstrapMem();
     FreeBlock *askMemFromOS(size_t totalReqSize, intptr_t startModifiedCnt,
                             int *lockedBinsThreshold, int numOfLockedBins,
                             bool *splittable);
@@ -780,8 +815,8 @@ private:
 
     void removeBlockFromBin(FreeBlock *fBlock);
 
-    void *allocRawMem(size_t &size) const;
-    void freeRawMem(void *object, size_t size) const;
+    void *allocRawMem(size_t &size);
+    bool freeRawMem(void *object, size_t size);
 
     void putLargeBlock(LargeMemoryBlock *lmb);
     void releaseCachesToLimit();
@@ -789,13 +824,11 @@ public:
     bool scanCoalescQ(bool forceCoalescQDrop);
     intptr_t blocksInCoalescing() const { return coalescQ.blocksInFly(); }
     void verify();
-#if __TBB_MALLOC_BACKEND_STAT
-    void reportStat(FILE *f);
-#endif
-    bool bootstrap(ExtMemoryPool *extMemoryPool);
+    void init(ExtMemoryPool *extMemoryPool);
     void reset();
     bool destroy();
     bool clean(); // clean on caches cleanup
+    void reportStat(FILE *f);
 
     BlockI *getSlabBlock(int num) {
         BlockI *b = (BlockI*)
@@ -821,6 +854,8 @@ public:
         releaseCachesToLimit();
     }
     inline size_t getMaxBinnedSize() const;
+
+    bool ptrCanBeValid(void *ptr) const { return usedAddrRange.inRange(ptr); }
 
 #if __TBB_MALLOC_WHITEBOX_TEST
     size_t getTotalMemSize() const { return totalMemSize; }
@@ -885,7 +920,7 @@ struct ExtMemoryPool {
 
     bool init(intptr_t poolId, rawAllocType rawAlloc, rawFreeType rawFree,
               size_t granularity, bool keepAllMemory, bool fixedPool);
-    void initTLS();
+    bool initTLS();
 
     // i.e., not system default pool for scalable_malloc/scalable_free
     bool userPool() const { return rawAlloc; }
@@ -894,29 +929,37 @@ struct ExtMemoryPool {
     bool softCachesCleanup();
     bool releaseAllLocalCaches();
     bool hardCachesCleanup();
-    void reset() {
+    bool reset() {
         loc.reset();
         allLocalCaches.reset();
-        tlsPointerKey.~TLSKey();
+        bool ret = tlsPointerKey.destroy();
         backend.reset();
+        return ret;
     }
-    void destroy() {
+    bool destroy() {
+        MALLOC_ASSERT(isPoolValid(),
+                      "Possible double pool_destroy or heap corruption");
         if (!userPool()) {
             loc.reset();
             allLocalCaches.reset();
         }
         // pthread_key_dtors must be disabled before memory unmapping
         // TODO: race-free solution
-        tlsPointerKey.~TLSKey();
+        bool ret = tlsPointerKey.destroy();
         if (rawFree || !userPool())
-            backend.destroy();
+            ret &= backend.destroy();
+        // pool is not valid after this point
+        granularity = 0;
+        return ret;
     }
     void delayRegionsReleasing(bool mode) { delayRegsReleasing = mode; }
     inline bool regionsAreReleaseable() const;
 
-    LargeMemoryBlock *mallocLargeObject(size_t allocationSize);
+    LargeMemoryBlock *mallocLargeObject(MemoryPool *pool, size_t allocationSize);
     void freeLargeObject(LargeMemoryBlock *lmb);
     void freeLargeObjectList(LargeMemoryBlock *head);
+    // use granulatity as marker for pool validity
+    bool isPoolValid() const { return granularity; }
 };
 
 inline bool Backend::inUserPool() const { return extMemPool->userPool(); }
@@ -980,7 +1023,7 @@ public:
     }
     void printStatus();
     void registerAllocation(bool available);
-    void registerReleasing(size_t size);
+    void registerReleasing(void* addr, size_t size);
 
     void init(size_t hugePageSize) {
         MALLOC_ASSERT(!hugePageSize || isPowerOfTwo(hugePageSize),

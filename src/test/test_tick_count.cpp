@@ -180,7 +180,7 @@ void TestResolution() {
     REMARK("avg_diff = %g ticks, max_diff = %g ticks\n", avg_diff, max_diff);
 }
 
-#include <tbb/compat/thread>
+#include "tbb/tbb_thread.h"
 
 int TestMain () {
     tbb::tick_count t0 = tbb::tick_count::now();

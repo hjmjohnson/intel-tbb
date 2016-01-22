@@ -25,9 +25,7 @@
 #include "harness_checktype.h"
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tick_count.h"
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 #include "harness_graph.h"
-#endif
 
 #include <cstdio>
 
@@ -344,10 +342,10 @@ int TestMain() {
     } 
     stop = tbb::tick_count::now();
     REMARK("Priority_Queue_Node Time=%6.6f\n", (stop-start).seconds());
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     REMARK("Testing resets\n");
     test_resets<int,tbb::flow::priority_queue_node<int> >();
     test_resets<float,tbb::flow::priority_queue_node<float> >();
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     test_buffer_extract<tbb::flow::priority_queue_node<int> >().run_tests();
 #endif
     return Harness::Done;

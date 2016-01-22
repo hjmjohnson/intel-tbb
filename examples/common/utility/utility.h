@@ -484,7 +484,11 @@ namespace utility{
    ;
 
     inline void report_elapsed_time(double seconds){
-        std::cout << "elapsed time : "<<seconds<<" seconds \n";
+        std::cout<<"elapsed time : "<<seconds<<" seconds"<<std::endl;
+    }
+
+    inline void report_skipped(){
+        std::cout<<"skip"<<std::endl;
     }
 
     inline void parse_cli_arguments(int argc, const char* argv[], utility::cli_argument_pack cli_pack){

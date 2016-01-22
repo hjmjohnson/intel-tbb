@@ -54,6 +54,8 @@
     #include <initializer_list>
 #endif
 
+#include "_tbb_hash_compare_impl.h"
+
 namespace tbb {
 namespace interface5 {
 //! @cond INTERNAL
@@ -641,32 +643,6 @@ private:
     typename allocator_type::template rebind<node>::other my_node_allocator;  // allocator object for nodes
     size_type                                             my_element_count;   // Total item count, not counting dummy nodes
     nodeptr_t                                             my_head;            // pointer to head node
-};
-
-// Template class for hash compare
-template<typename Key, typename Hasher, typename Key_equality>
-class hash_compare
-{
-public:
-    typedef Hasher hasher;
-    typedef Key_equality key_equal;
-
-    hash_compare() {}
-
-    hash_compare(Hasher a_hasher) : my_hash_object(a_hasher) {}
-
-    hash_compare(Hasher a_hasher, Key_equality a_keyeq) : my_hash_object(a_hasher), my_key_compare_object(a_keyeq) {}
-
-    size_t operator()(const Key& key) const {
-        return ((size_t)my_hash_object(key));
-    }
-
-    bool operator()(const Key& key1, const Key& key2) const {
-        return (!my_key_compare_object(key1, key2));
-    }
-
-    Hasher       my_hash_object;        // The hash object
-    Key_equality my_key_compare_object; // The equality comparator object
 };
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
@@ -1564,47 +1540,8 @@ private:
 #pragma warning(pop) // warning 4127 is back
 #endif
 
-//! Hash multiplier
-static const size_t hash_multiplier = tbb::internal::select_size_t_constant<2654435769U, 11400714819323198485ULL>::value;
 } // namespace internal
 //! @endcond
-//! Hasher functions
-template<typename T>
-inline size_t tbb_hasher( const T& t ) {
-    return static_cast<size_t>( t ) * internal::hash_multiplier;
-}
-template<typename P>
-inline size_t tbb_hasher( P* ptr ) {
-    size_t const h = reinterpret_cast<size_t>( ptr );
-    return (h >> 3) ^ h;
-}
-template<typename E, typename S, typename A>
-inline size_t tbb_hasher( const std::basic_string<E,S,A>& s ) {
-    size_t h = 0;
-    for( const E* c = s.c_str(); *c; ++c )
-        h = static_cast<size_t>(*c) ^ (h * internal::hash_multiplier);
-    return h;
-}
-template<typename F, typename S>
-inline size_t tbb_hasher( const std::pair<F,S>& p ) {
-    return tbb_hasher(p.first) ^ tbb_hasher(p.second);
-}
 } // namespace interface5
-using interface5::tbb_hasher;
-
-
-// Template class for hash compare
-template<typename Key>
-class tbb_hash
-{
-public:
-    tbb_hash() {}
-
-    size_t operator()(const Key& key) const
-    {
-        return tbb_hasher(key);
-    }
-};
-
 } // namespace tbb
 #endif // __TBB__concurrent_unordered_impl_H

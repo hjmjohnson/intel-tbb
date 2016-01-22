@@ -39,7 +39,7 @@ static const char _pad[NFS_MaxLineSize - sizeof(int)] = {};
 
 //------------------------------------------------------------------------
 // governor data
-basic_tls<generic_scheduler*> governor::theTLS;
+basic_tls<uintptr_t> governor::theTLS;
 unsigned governor::DefaultNumberOfThreads;
 rml::tbb_factory governor::theRMLServerFactory;
 bool governor::UsePrivateRML;
@@ -78,7 +78,7 @@ bool __TBB_InitOnce::InitializationDone;
 // generic_scheduler data
 
 //! Pointer to the scheduler factory function
-generic_scheduler* (*AllocateSchedulerPtr)( arena*, size_t index );
+generic_scheduler* (*AllocateSchedulerPtr)( market& );
 
 #if __TBB_OLD_PRIMES_RNG
 //! Table of primes used by fast random-number generator (FastRandom).

@@ -140,8 +140,8 @@ static inline bool isAligned(T* arg, uintptr_t alignment) {
 static inline bool isPowerOfTwo(uintptr_t arg) {
     return tbb::internal::is_power_of_two(arg);
 }
-static inline bool isPowerOfTwoMultiple(uintptr_t arg, uintptr_t divisor) {
-    return arg && tbb::internal::is_power_of_two_factor(arg,divisor);
+static inline bool isPowerOfTwoAtLeast(uintptr_t arg, uintptr_t power2) {
+    return arg && tbb::internal::is_power_of_two_at_least(arg,power2);
 }
 
 #define MALLOC_STATIC_ASSERT(condition,msg) __TBB_STATIC_ASSERT(condition,msg)

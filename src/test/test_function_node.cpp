@@ -215,12 +215,10 @@ void buffered_levels_with_copy( size_t concurrency ) {
         size_t global_count = global_execute_count;
         size_t inc_count = body_copy.local_execute_count;
         ASSERT( global_count == expected_count && global_count == inc_count, NULL ); 
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         g.reset(tbb::flow::rf_reset_bodies);
         body_copy = tbb::flow::copy_body<inc_functor>( exe_node );
         inc_count = body_copy.local_execute_count;
         ASSERT( Offset == inc_count, "reset(rf_reset_bodies) did not reset functor" ); 
-#endif
     }
 }
 
@@ -460,7 +458,7 @@ struct add_to_counter {
     int operator()(int i){*counter+=1; return i + 1;}
 };
 
-template<tbb::flow::graph_buffer_policy FTYPE>
+template<typename FTYPE>
 void test_extract() {
     int my_count = 0;
     int cm;

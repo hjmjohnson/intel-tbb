@@ -29,7 +29,8 @@
 #define TBB_PREVIEW_AGGREGATOR 1
 #define TBB_PREVIEW_CONCURRENT_LRU_CACHE 1
 #define TBB_PREVIEW_VARIADIC_PARALLEL_INVOKE 1
-#define TBB_PREVIEW_FLOW_GRAPH_NODES 1 
+#define TBB_PREVIEW_FLOW_GRAPH_NODES 1
+#define TBB_PREVIEW_GLOBAL_CONTROL 1
 #endif
 
 #include "harness_defs.h"
@@ -151,9 +152,6 @@ static void TestPreviewNames() {
     TestTypeDefinitionPresence( aggregator );
     TestTypeDefinitionPresence( aggregator_ext<Handler> );
     TestTypeDefinitionPresence2(concurrent_lru_cache<int, int> );
-    #if __TBB_PREVIEW_COMPOSITE_NODE
-    TestTypeDefinitionPresence2( composite_node<tbb::flow::tuple<int>, tbb::flow::tuple<int> > );
-    #endif
 }
 #endif
 
@@ -203,6 +201,9 @@ int TestMain ()
     TestTypeDefinitionPresence( flow::priority_queue_node<int> );
     TestTypeDefinitionPresence( flow::limiter_node<int> );
     TestTypeDefinitionPresence2(flow::indexer_node<int, int> );
+#if __TBB_FLOW_GRAPH_CPP11_FEATURES
+    TestTypeDefinitionPresence2( flow::composite_node<tbb::flow::tuple<int>, tbb::flow::tuple<int> > );
+#endif
     using tbb::flow::queueing;
     TestTypeDefinitionPresence2( flow::join_node< intpair, queueing > );
     /* Mutex names */
@@ -254,6 +255,9 @@ int TestMain ()
     TestTypeDefinitionPresence( tbb_allocator<int> );
     TestTypeDefinitionPresence( zero_allocator<int> );
     TestTypeDefinitionPresence( tick_count );
+#if TBB_PREVIEW_GLOBAL_CONTROL
+    TestTypeDefinitionPresence( global_control );
+#endif
 
 #if __TBB_CPF_BUILD
     TestPreviewNames();

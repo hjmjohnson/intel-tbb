@@ -184,12 +184,10 @@ void continue_nodes_with_copy( ) {
         size_t global_count = global_execute_count;
         size_t inc_count = body_copy.local_execute_count;
         ASSERT( global_count == expected_count && global_count == inc_count, NULL );
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         g.reset(tbb::flow::rf_reset_bodies);
         body_copy = tbb::flow::copy_body< inc_functor<OutputType> >( exe_node );
         inc_count = body_copy.local_execute_count;
         ASSERT( Offset == inc_count, "reset(rf_reset_bodies) did not reset functor" );
-#endif
 
     }
 }

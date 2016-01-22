@@ -43,7 +43,7 @@ void *ErrnoPreservingMalloc(size_t bytes)
 #include <sys/mman.h>
 #if __linux__
 /* __TBB_MAP_HUGETLB is MAP_HUGETLB from system header linux/mman.h.
-   The header do not included here, as on some Linux flavors inclusion of
+   The header is not included here, as on some Linux flavors inclusion of
    linux/mman.h leads to compilation error,
    while changing of MAP_HUGETLB is highly unexpected.
 */

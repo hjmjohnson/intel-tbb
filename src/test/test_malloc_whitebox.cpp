@@ -953,7 +953,7 @@ void LOCModelTester() {
             defaultMemPool->extMemPool.freeLargeObject(lmb);
             cacheBinModel.putList(num);
         } else {
-            scen.saveLmb(defaultMemPool->extMemPool.mallocLargeObject(allocationSize));
+            scen.saveLmb(defaultMemPool->extMemPool.mallocLargeObject(defaultMemPool, allocationSize));
             cacheBinModel.get();
         }
 
@@ -1029,7 +1029,7 @@ public:
         barrier.wait();
         for ( int i=0; i<NUM_ALLOCS; ++i ) {
             defaultMemPool->extMemPool.freeLargeObject(
-                    defaultMemPool->extMemPool.mallocLargeObject(allocationSize) );
+                defaultMemPool->extMemPool.mallocLargeObject(defaultMemPool, allocationSize) );
         }
     }
 
@@ -1065,7 +1065,7 @@ public:
         barrier.wait();
         rml::internal::LargeMemoryBlock *lmbArray[NUM_ALLOCS];
         for ( int i=0; i<NUM_ALLOCS; ++i )
-            lmbArray[i] = defaultMemPool->extMemPool.mallocLargeObject(allocationSize);
+            lmbArray[i] = defaultMemPool->extMemPool.mallocLargeObject(defaultMemPool, allocationSize);
 
         barrier.wait(CheckNumAllocs(num_threads));
         for ( int i=0; i<NUM_ALLOCS; ++i )

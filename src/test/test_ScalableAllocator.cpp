@@ -74,8 +74,6 @@ public:
     }
 };
 
-#if TBB_USE_EXCEPTIONS
-
 class NullAllocator {
 public:
     typedef char value_type;
@@ -88,19 +86,12 @@ public:
 
 void TestZeroSpaceMemoryPool()
 {
-    try {
-        tbb::memory_pool<NullAllocator> pool;
-        ASSERT(0, "Useless allocator with no memory must not be created");
-    } catch (std::runtime_error) {
-    } catch (...) {
-        ASSERT(0, "wrong exception type; expected runtime_error");
-    }
+    tbb::memory_pool<NullAllocator> pool;
+    bool allocated = pool.malloc(16) || pool.malloc(9*1024);
+    ASSERT(!allocated, "Allocator with no memory must not allocate anything.");
 }
 
-#else // TBB_USE_EXCEPTIONS
-
-void TestZeroSpaceMemoryPool() { }
-
+#if !TBB_USE_EXCEPTIONS
 struct FixedPool {
     void  *buf;
     size_t size;
@@ -117,8 +108,7 @@ static void *fixedBufGetMem(intptr_t pool_id, size_t &bytes)
     bytes = ((FixedPool*)pool_id)->size;
     return ((FixedPool*)pool_id)->buf;
 }
-
-#endif // TBB_USE_EXCEPTIONS
+#endif
 
 /* test that pools in small space are either usable or not created
    (i.e., exception raised) */
@@ -136,16 +126,7 @@ void TestSmallFixedSizePool()
    that can be fulfilled from the pool. 16B allocation fits in 16KB slabs,
    so it requires at least 16KB. Requirement of 9KB allocation is more modest.
 */
-            try {
-                allocated = pool.malloc( 16 ) || pool.malloc( 9*1024 );
-                ASSERT(allocated, "If pool created, it must be useful.");
-            } catch (std::bad_alloc) {
-            } catch (...) {
-                ASSERT(0, "wrong exception type; expected bad_alloc");
-            }
-        } catch (std::runtime_error) {
-            // This occurs when no space in buf for internal pool
-            // structures. Can't predict exact size for this.
+            allocated = pool.malloc( 16 ) || pool.malloc( 9*1024 );
         } catch (std::invalid_argument) {
             ASSERT(!sz, "expect std::invalid_argument for zero-sized pool only");
         } catch (...) {
@@ -165,7 +146,6 @@ void TestSmallFixedSizePool()
 
         if (ret == rml::POOL_OK) {
             allocated = pool_malloc(pool, 16) || pool_malloc(pool, 9*1024);
-            ASSERT(allocated, "If pool created, it must be useful.");
             pool_destroy(pool);
         } else
             ASSERT(ret == rml::NO_MEMORY, "Expected that pool either valid "

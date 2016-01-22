@@ -27,6 +27,19 @@
 #include "harness_report.h"
 #include "harness_assert.h"
 
+bool CheckSignatures() {
+    // Checks that thread ids can be compared, in the way users would do it
+    THREAD::id id1, id2;
+    bool result = id1 == id2;
+    result |= id1 != id2;
+    result |= id1 < id2;
+    result |= id1 > id2;
+    result |= id1 <= id2;
+    result |= id1 >= id2;
+    tbb::tbb_hash<THREAD::id> hash;
+    return result |= hash(id1)==hash(id2);
+}
+
 static const int THRDS = 3;
 static const int THRDS_DETACH = 2;
 static tbb::atomic<int> sum;
@@ -175,9 +188,8 @@ void CheckExceptionSafety() {
 #include <cstdio>
 
 #if __TBB_CPP11_RVALUE_REF_PRESENT
-
-tbb::tbb_thread returnThread() {
-    return tbb::tbb_thread();
+THREAD returnThread() {
+    return THREAD();
 }
 #endif
 
@@ -294,16 +306,4 @@ void RunTests() {
     }
 
     ASSERT( THREAD::hardware_concurrency() > 0, NULL);
-}
-
-typedef bool (*id_relation)( THREAD::id, THREAD::id );
-
-id_relation CheckSignatures() {
-    id_relation r[6] = {&tbb::operator==,
-                        &tbb::operator!=,
-                        &tbb::operator<,
-                        &tbb::operator>,
-                        &tbb::operator<=,
-                        &tbb::operator>=};
-    return r[1];
 }

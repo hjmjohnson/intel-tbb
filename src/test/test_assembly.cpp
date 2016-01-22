@@ -133,6 +133,21 @@ static void TestPause() {
     __TBB_Pause(1);
 }
 
+static void TestTimeStamp() {
+    REMARK("testing __TBB_time_stamp");
+#if defined(__TBB_time_stamp)
+    tbb::internal::machine_tsc_t prev = __TBB_time_stamp();
+    for ( int i=0; i<1000; ++i ) {
+        tbb::internal::machine_tsc_t curr = __TBB_time_stamp();
+        ASSERT(curr>prev, "__TBB_time_stamp has returned non-monotonically increasing quantity");
+        prev=curr;
+    }
+    REMARK("\n");
+#else
+    REMARK(" skipped\n");
+#endif
+}
+
 int TestMain () {
     __TBB_TRY {
         TestLog2();
@@ -140,6 +155,7 @@ int TestMain () {
         TestCompareExchange();
         TestAtomicCounter();
         TestPause();
+        TestTimeStamp();
     } __TBB_CATCH(...) {
         ASSERT(0,"unexpected exception");
     }

@@ -995,6 +995,7 @@ void TypeTesterUniquePtr(const std::vector<T> &vec) {
     Examine</*isCopyCtor=*/false>(q1, q1Copy, vecSorted);
     Examine</*isCopyCtor=*/false>(q2, q2Copy, vecSorted);
 
+#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT
     Queue q3Copy;
     QueueDebugAlloc q4Copy;
 
@@ -1011,6 +1012,7 @@ void TypeTesterUniquePtr(const std::vector<T> &vec) {
     QueueDebugAlloc q4( std::move(q2) );
     Examine</*isCopyCtor=*/false>(q3, q3Copy, vecSorted);
     Examine</*isCopyCtor=*/false>(q4, q4Copy, vecSorted);
+#endif //__TBB_CPP11_VARIADIC_TEMPLATES_PRESENT
 }
 #endif /* __TBB_CPP11_SMART_POINTERS_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT && __TBB_CPP11_IS_COPY_CONSTRUCTIBLE_PRESENT */
 

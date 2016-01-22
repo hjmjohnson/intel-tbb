@@ -48,7 +48,7 @@ size_t __TBB_EXPORTED_FUNC get_initial_auto_partitioner_divisor();
 }}
 
 int ArenaConcurrency() {
-    return tbb::internal::get_initial_auto_partitioner_divisor()/4; // TODO: expose through task_arena interface?
+    return int(tbb::internal::get_initial_auto_partitioner_divisor()/4); // TODO: expose through task_arena interface?
 }
 
 // Generally, TBB does not guarantee mandatory parallelism. This test uses some whitebox knowledge about when all the threads can be available

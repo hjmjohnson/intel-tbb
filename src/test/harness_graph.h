@@ -289,7 +289,7 @@ struct harness_counting_receiver : public tbb::flow::receiver<T>, NoCopy {
 
     /* override */ tbb::task *try_put_task( const T & ) {
       ++my_count;
-      return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
+      return const_cast<tbb::task *>(tbb::flow::interface8::SUCCESSFULLY_ENQUEUED);
     }
 
     void validate() {
@@ -307,11 +307,8 @@ struct harness_counting_receiver : public tbb::flow::receiver<T>, NoCopy {
     /*override*/void copy_predecessors(predecessor_list_type &) { }
     /*override*/size_t predecessor_count() { return 0; }
     /*override*/void clear_predecessors() { my_count = 0; };
-    /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { my_count = 0; }
-#else
-    /*override*/void reset_receiver() { my_count = 0; }
 #endif
-
+    /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { my_count = 0; }
 };
 
 //! Counts the number of puts received
@@ -352,7 +349,7 @@ struct harness_mapped_receiver : public tbb::flow::receiver<T>, NoCopy {
       } else {
           ++my_count;
       }
-      return const_cast<tbb::task *>(tbb::flow::interface7::SUCCESSFULLY_ENQUEUED);
+      return const_cast<tbb::task *>(tbb::flow::interface8::SUCCESSFULLY_ENQUEUED);
     }
 
     void validate() {
@@ -376,10 +373,12 @@ struct harness_mapped_receiver : public tbb::flow::receiver<T>, NoCopy {
     /*override*/void copy_predecessors(predecessor_list_type &) { }
     /*override*/size_t predecessor_count() { return 0; }
     /*override*/void clear_predecessors() { my_count = 0; };
-    /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { my_count = 0; if(my_map) delete my_map; my_map = new map_type; }
-#else
-    /*override*/void reset_receiver() { my_count = 0; if(my_map) delete my_map; my_map = new map_type; }
 #endif
+    /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) {
+        my_count = 0;
+        if(my_map) delete my_map;
+        my_map = new map_type;
+    }
 
 };
 
@@ -540,6 +539,7 @@ found_it:
     }
     return true;
 }
+#endif  /* TBB_PREVIEW_FLOW_GRAPH_FEATURES */
 
 template<typename T, typename BufferType>
 void test_resets() {
@@ -654,6 +654,8 @@ void test_resets() {
         ASSERT(b0.try_get(outt) && (T)23 == outt, "node lost its input"); 
     }
 }
+
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 
 template< typename NODE_TYPE >
 class test_buffer_base_extract {

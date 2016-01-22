@@ -18,17 +18,16 @@ REM implication, inducement, estoppel or otherwise.  Any license under such
 REM intellectual property rights must be express and approved by Intel in
 REM writing.
 REM
-
 :: Getting parameters
 :: Architecture
 if ("%1") == ("") goto error0
 :: Release/Debug
 if ("%2") == ("") goto error0
 :: Output directory
-if ("%3") == ("") goto error0
+if (%3) == ("") goto error0
 set arch=%1
 if ("%2") == ("debug") set postfix=_debug
-set output_dir=%3
+set output_dir="%3"
 if ("%4") == ("") set dat_file="%output_dir%\..\..\dat\balls.dat"
 
 :: Actually we can set install root by ourselves

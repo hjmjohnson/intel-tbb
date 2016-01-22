@@ -56,6 +56,7 @@ private:
     friend void ITT_DoUnsafeOneTimeInitialization ();
 
     typedef intrusive_list<arena> arena_list_type;
+    typedef intrusive_list<generic_scheduler> scheduler_list_type;
 
     //! Currently active global market
     static market* theMarket;
@@ -255,7 +256,7 @@ public:
     //! Creates an arena object
     /** If necessary, also creates global market instance, and boosts its ref count.
         Each call to create_arena() must be matched by the call to arena::free_arena(). **/
-    static arena& create_arena ( int num_slots, size_t stack_size, bool default_concurrency_requested );
+    static arena* create_arena ( int num_slots, int num_reserved_slots, size_t stack_size, bool default_concurrency_requested );
 
     //! Removes the arena from the market's list
     void try_destroy_arena ( arena*, uintptr_t aba_epoch );
@@ -300,6 +301,10 @@ public:
 
 #if __TBB_TASK_GROUP_CONTEXT
     //! Finds all contexts affected by the state change and propagates the new state to them.
+    /** The propagation is relayed to the market because tasks created by one
+        master thread can be passed to and executed by other masters. This means
+        that context trees can span several arenas at once and thus state change
+        propagation cannot be generally localized to one arena only. **/
     template <typename T>
     bool propagate_task_group_state ( T task_group_context::*mptr_state, task_group_context& src, T new_state );
 #endif /* __TBB_TASK_GROUP_CONTEXT */
@@ -320,15 +325,15 @@ public:
 #endif /* __TBB_TASK_PRIORITY */
 
 #if __TBB_COUNT_TASK_NODES
-    //! Returns the number of task objects "living" in worker threads
-    intptr_t workers_task_node_count();
-
     //! Net number of nodes that have been allocated from heap.
     /** Updated each time a scheduler or arena is destroyed. */
     void update_task_node_count( intptr_t delta ) { my_task_node_count += delta; }
 #endif /* __TBB_COUNT_TASK_NODES */
 
 #if __TBB_TASK_GROUP_CONTEXT
+    //! List of registered master threads
+    scheduler_list_type my_masters;
+
     //! Array of pointers to the registered workers
     /** Used by cancellation propagation mechanism.
         Must be the last data member of the class market. **/
@@ -340,26 +345,6 @@ public:
         return theMarket? theMarket->my_num_workers_hard_limit : 0;
     }
 }; // class market
-
-#if __TBB_TASK_PRIORITY
-    #define BeginForEachArena(a)    \
-        arenas_list_mutex_type::scoped_lock arena_list_lock(my_arenas_list_mutex);  \
-        for ( intptr_t i = my_global_top_priority; i >= my_global_bottom_priority; --i ) {  \
-            /*arenas_list_mutex_type::scoped_lock arena_list_lock(my_priority_levels[i].my_arenas_list_mutex);*/ \
-            arena_list_type &arenas = my_priority_levels[i].arenas;
-#else /* !__TBB_TASK_PRIORITY */
-    #define BeginForEachArena(a)    \
-        arena_list_type &arenas = my_arenas; {
-#endif /* !__TBB_TASK_PRIORITY */
-
-#define ForEachArena(a)     \
-    BeginForEachArena(a)    \
-        arena_list_type::iterator it = arenas.begin();  \
-        for ( ; it != arenas.end(); ++it ) {            \
-            arena &a = *it;
-
-#define EndForEach() }}
-
 
 } // namespace internal
 } // namespace tbb

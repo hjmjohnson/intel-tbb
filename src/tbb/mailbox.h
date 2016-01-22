@@ -187,7 +187,6 @@ public:
 
     //! Attach inbox to a corresponding outbox. 
     void attach( mail_outbox& putter ) {
-        __TBB_ASSERT(!my_putter,"already attached");
         my_putter = &putter;
     }
     //! Detach inbox from its outbox

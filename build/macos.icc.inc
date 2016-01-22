@@ -34,7 +34,7 @@ LIBDL = -ldl
 OPENMP_FLAG = -openmp
 LIBS = -lpthread
 LINK_FLAGS =
-LIB_LINK_FLAGS = -dynamiclib -i-static -install_name @rpath/$(BUILDING_LIBRARY)
+LIB_LINK_FLAGS = -dynamiclib -static-intel -install_name @rpath/$(BUILDING_LIBRARY)
 C_FLAGS = $(CPLUS_FLAGS)
 # ICC 11.0 and higher support -std=c++0x
 ifneq (,$(shell icc -dumpversion | egrep  "^1[1-9]\."))
@@ -64,12 +64,10 @@ endif
 
 # ICC 14.0 and higher support usage of libc++, clang standard library
 ifneq (,$(shell icc -dumpversion | egrep  "^1[4-9]\."))
-    LIBCPP_KEY = -stdlib=libc++
+ifneq (,$(stdlib))
+    CPLUS_FLAGS    += -stdlib=$(stdlib)
+    LIB_LINK_FLAGS += -stdlib=$(stdlib)
 endif
-
-ifeq (libc++,$(stdlib))
-    CPLUS_FLAGS    += $(LIBCPP_KEY)
-    LIB_LINK_FLAGS += $(LIBCPP_KEY)
 endif
 
 #------------------------------------------------------------------------------

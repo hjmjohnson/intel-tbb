@@ -50,11 +50,6 @@ using std::memcmp;
     #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
 
-// Intel(R) Compiler have an issue when a scoped enum with a specified underlying type has negative values.
-#define __TBB_ICC_SCOPED_ENUM_WITH_UNDERLYING_TYPE_NEGATIVE_VALUE_BROKEN ( _MSC_VER && !__TBB_DEBUG && __INTEL_COMPILER && __INTEL_COMPILER <= 1500 )
-// Intel(R) Compiler have an issue with __atomic_load_explicit from a scoped enum with a specified underlying type.
-#define __TBB_ICC_SCOPED_ENUM_WITH_UNDERLYING_TYPE_ATOMIC_LOAD_BROKEN ( TBB_USE_ICC_BUILTINS && !__TBB_DEBUG && __INTEL_COMPILER && __INTEL_COMPILER <= 1500 )
-
 enum LoadStoreExpression {
     UseOperators,
     UseImplicitAcqRel,
@@ -396,6 +391,7 @@ void TestConstExprInitializationIsTranslationTime(){
     constexpr atomic_t a(8);
     ASSERT(a == 8,ct_init_failed_msg);
 
+#if !__TBB_CONSTEXPR_MEMBER_FUNCTION_BROKEN
     constexpr tbb::atomic<test_constexpr_initialization_helper::white_box_ad_hoc_type> ct_atomic(10);
     //for some unknown reason clang does not managed to enum syntax
 #if __clang__
@@ -407,6 +403,7 @@ void TestConstExprInitializationIsTranslationTime(){
     ASSERT(ct_atomic_value_ten == 10,ct_init_failed_msg);
     int array[ct_atomic_value_ten];
     ASSERT(Harness::array_length(array) == 10,ct_init_failed_msg);
+#endif //__TBB_CONSTEXPR_MEMBER_FUNCTION_BROKEN
 }
 
 #include <string>
@@ -475,7 +472,7 @@ namespace TestConstExprInitializationOfGlobalObjectsHelper{
        static_before(){ result = (static_atomic==ct_value); }            \
     } ;                                                                  \
                                                                          \
-    typename tester<T>::static_before tester<T>::static_before_;         \
+    tester<T>::static_before tester<T>::static_before_;                  \
     tbb::atomic<T> tester<T>::static_atomic(ct_value);                   \
                                                                          \
     auto_registered_tests_helper::registration<T> tester<T>::registered; \

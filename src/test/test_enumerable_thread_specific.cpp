@@ -95,16 +95,16 @@ static size_t AlignMask = 0;  // set to cache-line-size - 1
 
 template<typename T>
 T& check_alignment(T& t, const char *aname) { 
-    if( (size_t(&t) & AlignMask) != 0) {
-        REPORT_ONCE("alignment error with %s allocator (%x)\n", aname, (int)size_t(&t) & AlignMask);
+    if( !tbb::internal::is_aligned(&t, AlignMask)) {
+        REPORT_ONCE("alignment error with %s allocator (%x)\n", aname, (int)size_t(&t) & (AlignMask-1));
     }
     return t;
 }
 
 template<typename T>
 const T& check_alignment(const T& t, const char *aname) {
-    if( (size_t(&t) & AlignMask) != 0) {
-        REPORT_ONCE("alignment error with %s allocator (%x)\n", aname, (int)size_t(&t) & AlignMask);
+    if( !tbb::internal::is_aligned(&t, AlignMask)) {
+        REPORT_ONCE("alignment error with %s allocator (%x)\n", aname, (int)size_t(&t) & (AlignMask-1));
     }
     return t;
 }
@@ -1080,7 +1080,7 @@ void run_segmented_iterator_tests() {
 }
 
 template<typename T, template<class> class Allocator, typename Init>
-tbb::enumerable_thread_specific<T> MakeETS( Init init ) {
+tbb::enumerable_thread_specific<T,Allocator<T> > MakeETS( Init init ) {
     return tbb::enumerable_thread_specific<T,Allocator<T> >(init);
 }
 #if __TBB_ETS_USE_CPP11
@@ -1102,22 +1102,52 @@ tbb::enumerable_thread_specific<T,Allocator<T> > MakeETS( tbb::internal::stored_
 
 template<typename T, template<class> class Allocator, typename InitSrc, typename InitDst, typename Validator>
 void ets_copy_assign_test( InitSrc init1, InitDst init2, Validator check, const char *allocator_name ) {
-    // Create the source instance
     typedef tbb::enumerable_thread_specific<T, Allocator<T> > ets_type;
-    const ets_type& temporary_binder = MakeETS<T, Allocator>(init1);
-    ets_type& source = const_cast<ets_type&>(temporary_binder);
+
+    // Create the source instance
+    const ets_type& cref_binder = MakeETS<T, Allocator>(init1);
+    ets_type& source = const_cast<ets_type&>(cref_binder);
     check(check_alignment(source.local(),allocator_name));
 
     // Test copy construction
-    source.clear();
+    bool existed = false;
     ets_type copy(source);
+    check(check_alignment(copy.local(existed),allocator_name));
+    ASSERT(existed, "Local data not created by ETS copy constructor");
+    copy.clear();
     check(check_alignment(copy.local(),allocator_name));
 
     // Test assignment
-    source.clear();
+    existed = false;
     ets_type assign(init2);
     assign = source;
+    check(check_alignment(assign.local(existed),allocator_name));
+    ASSERT(existed, "Local data not created by ETS assignment");
+    assign.clear();
     check(check_alignment(assign.local(),allocator_name));
+
+#if __TBB_ETS_USE_CPP11
+    // Create the source instance
+    ets_type&& rvref_binder = MakeETS<T, Allocator>(init1);
+    check(check_alignment(rvref_binder.local(),allocator_name));
+
+    // Test move construction
+    existed = false;
+    ets_type moved(rvref_binder);
+    check(check_alignment(moved.local(existed),allocator_name));
+    ASSERT(existed, "Local data not created by ETS move constructor");
+    moved.clear();
+    check(check_alignment(moved.local(),allocator_name));
+
+    // Test assignment
+    existed = false;
+    ets_type move_assign(init2);
+    move_assign = std::move(moved);
+    check(check_alignment(move_assign.local(existed),allocator_name));
+    ASSERT(existed, "Local data not created by ETS move assignment");
+    move_assign.clear();
+    check(check_alignment(move_assign.local(),allocator_name));
+#endif
 }
 
 template<typename T, int Expected>
@@ -1189,11 +1219,12 @@ struct HasNoDefaultConstructorCombine {
 };
 
 #if __TBB_ETS_USE_CPP11
-// Class that only has a constructor with multiple parameters
-class HasSpecialConstructor : NoCopy {
-    HasSpecialConstructor();
+// Class that only has a constructor with multiple parameters and a move constructor
+class HasSpecialAndMoveCtor : NoCopy {
+    HasSpecialAndMoveCtor();
 public:
-    HasSpecialConstructor( SecretTagType, size_t = size_t(0), const char* = "" ) {}
+    HasSpecialAndMoveCtor( SecretTagType, size_t = size_t(0), const char* = "" ) {}
+    HasSpecialAndMoveCtor( HasSpecialAndMoveCtor&& ) {}
 };
 #endif
 
@@ -1256,25 +1287,35 @@ void TestInstantiation(const char *allocator_name) {
     REMARK("TestInstantiation<%s>\n", allocator_name);
     // Test instantiation is possible when copy constructor is not required.
     tbb::enumerable_thread_specific<NoCopy, Allocator<NoCopy> > ets1;
+    ets1.local();
     ets1.combine_each(EmptyCombineEach<NoCopy>());
 
     // Test instantiation when default constructor is not required, because exemplar is provided.
     HasNoDefaultConstructor x(SecretTag);
     tbb::enumerable_thread_specific<HasNoDefaultConstructor, Allocator<HasNoDefaultConstructor> > ets2(x);
+    ets2.local();
     ets2.combine(HasNoDefaultConstructorCombine());
 
     // Test instantiation when default constructor is not required, because init function is provided.
     HasNoDefaultConstructorFinit f;
     tbb::enumerable_thread_specific<HasNoDefaultConstructor, Allocator<HasNoDefaultConstructor> > ets3(f);
+    ets3.local();
     ets3.combine(HasNoDefaultConstructorCombine());
 
 #if __TBB_ETS_USE_CPP11
     // Test instantiation with multiple arguments
-    tbb::enumerable_thread_specific<HasSpecialConstructor, Allocator<HasSpecialConstructor> > ets4(SecretTag, 0x42, "meaningless");
-    ets4.combine_each(EmptyCombineEach<HasSpecialConstructor>());
+    tbb::enumerable_thread_specific<HasSpecialAndMoveCtor, Allocator<HasSpecialAndMoveCtor> > ets4(SecretTag, 0x42, "meaningless");
+    ets4.local();
+    ets4.combine_each(EmptyCombineEach<HasSpecialAndMoveCtor>());
     // Test instantiation with one argument that should however use the variadic constructor
-    tbb::enumerable_thread_specific<HasSpecialConstructor, Allocator<HasSpecialConstructor> > ets5(SecretTag);
-    ets5.combine_each(EmptyCombineEach<HasSpecialConstructor>());
+    tbb::enumerable_thread_specific<HasSpecialAndMoveCtor, Allocator<HasSpecialAndMoveCtor> > ets5(SecretTag);
+    ets5.local();
+    ets5.combine_each(EmptyCombineEach<HasSpecialAndMoveCtor>());
+    // Test that move operations do not impose extra requirements
+    // Default allocator is used. If it does not match Allocator, there will be elementwise move
+    tbb::enumerable_thread_specific<HasSpecialAndMoveCtor> ets6( std::move(ets4) );
+    ets6.combine_each(EmptyCombineEach<HasSpecialAndMoveCtor>());
+    ets6 = std::move(ets5);
 #endif
 }
 
@@ -1300,17 +1341,18 @@ void TestConstructorWithBigType(const char *allocator_name) {
 
 int TestMain () {
     size_t tbb_allocator_mask;
-    size_t cache_allocator_mask = tbb::internal::NFS_GetLineSize() - 1;
+    size_t cache_allocator_mask = tbb::internal::NFS_GetLineSize();
     REMARK("estimatedCacheLineSize == %d, NFS_GetLineSize() returns %d\n",
                 (int)estimatedCacheLineSize, (int)tbb::internal::NFS_GetLineSize());
+    //TODO: use __TBB_alignof(T) to check for local() results instead of using internal knowledges of ets element padding
     if(tbb::tbb_allocator<int>::allocator_type() == tbb::tbb_allocator<int>::standard) {
         // scalable allocator is not available.
-        tbb_allocator_mask = 0;
+        tbb_allocator_mask = 1;
         REMARK("tbb::tbb_allocator is not available\n");
     }
     else {
         // this value is for large objects, but will be correct for small.
-        tbb_allocator_mask = estimatedCacheLineSize - 1;
+        tbb_allocator_mask = estimatedCacheLineSize;
     }
     AlignMask = cache_allocator_mask;
     TestInstantiation<tbb::cache_aligned_allocator>("tbb::cache_aligned_allocator");

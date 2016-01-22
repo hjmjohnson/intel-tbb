@@ -817,8 +817,7 @@ LargeMemoryBlock *LargeObjectCache::get(size_t size)
     return NULL;
 }
 
-
-LargeMemoryBlock *ExtMemoryPool::mallocLargeObject(size_t allocationSize)
+LargeMemoryBlock *ExtMemoryPool::mallocLargeObject(MemoryPool *pool, size_t allocationSize)
 {
 #if __TBB_MALLOC_LOCACHE_STAT
     AtomicIncrement(mallocCalls);
@@ -838,6 +837,7 @@ LargeMemoryBlock *ExtMemoryPool::mallocLargeObject(size_t allocationSize)
             return NULL;
         }
         lmb->backRefIdx = backRefIdx;
+        lmb->pool = pool;
         STAT_increment(getThreadId(), ThreadCommonCounters, allocNewLargeObj);
     } else {
 #if __TBB_MALLOC_LOCACHE_STAT
